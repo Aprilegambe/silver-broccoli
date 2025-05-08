@@ -8,273 +8,298 @@ import java.util.List;
 import java.util.Random;
 
 public class Gioco extends JPanel {
-    private final int SIZE = 10;
-    private JButton[][] playerGrid = new JButton[SIZE][SIZE];
-    private JButton[][] botGrid = new JButton[SIZE][SIZE];
-    private boolean[][] playerShips = new boolean[SIZE][SIZE];
-    private boolean[][] botShips = new boolean[SIZE][SIZE];
-    private boolean playerTurn = true;
-    private boolean horizontal = true;
-    private int[] shipSizes = {5, 4, 3, 3, 2}; // Dimensioni variabili delle navi
-    private int currentShipIndex = 0;
-    private Random random = new Random();
-    private JTextArea log = new JTextArea(10, 20);
-    private int playerHits = 0;
-    private int botHits = 0;
-    private final int MAX_HITS = 17; // Somma delle dimensioni delle navi
-    private JFrame frame;
-    private boolean isHardMode;
-    private List<Point> botTargets = new ArrayList<>(); // Lista dei bersagli successivi per il bot
+    private final int DIMENSIONE = 10;
+    private JButton[][] grigliaGiocatore = new JButton[DIMENSIONE][DIMENSIONE];
+    private JButton[][] grigliaBot = new JButton[DIMENSIONE][DIMENSIONE];
+    private boolean[][] naviGiocatore = new boolean[DIMENSIONE][DIMENSIONE];
+    private boolean[][] naviBot = new boolean[DIMENSIONE][DIMENSIONE];
+    private boolean turnoGiocatore = true;
+    private boolean orizzontale = true;
+    private int[] dimensioniNavi = {5, 4, 3, 3, 2};
+    private int indiceNaveCorrente = 0;
+    private Random casuale = new Random();
+    private JTextArea registro = new JTextArea(10, 20);
+    private int colpiGiocatore = 0;
+    private int colpiBot = 0;
+    private final int COLPI_MASSIMI = 17;
+    private JFrame finestra;
+    private boolean modalitaDifficile;
+    private List<Point> bersagliBot = new ArrayList<>();
 
-    public Gioco(JFrame frame, boolean difficile) {
-        this.frame = frame;
-        this.isHardMode = difficile;
+    public Gioco(JFrame finestra, boolean difficile) {
+        this.finestra = finestra;
+        this.modalitaDifficile = difficile;
         setLayout(new BorderLayout());
-        JPanel grids = new JPanel(new GridLayout(1, 2, 10, 10));
 
-        grids.add(createGrid(playerGrid, false));
-        grids.add(createGrid(botGrid, true));
-        placeBotShips();
+        JPanel griglie = new JPanel(new GridLayout(1, 2, 10, 10));
+        griglie.add(creaGriglia(grigliaGiocatore, false));
+        griglie.add(creaGriglia(grigliaBot, true));
+        posizionaNaviBot();
 
-        JPanel sidebar = new JPanel(new BorderLayout());
+        JPanel barraLaterale = new JPanel(new BorderLayout());
         JButton reset = new JButton("Reset");
-        JButton back = new JButton("Torna al menu");
-        reset.addActionListener(e -> resetGame());
-        back.addActionListener(e -> frame.setContentPane(new Menu(frame)));
+        JButton menu = new JButton("Torna al menu");
 
-        log.setEditable(false);
-        log.append("Posiziona le tue navi: dimensione attuale " + shipSizes[currentShipIndex] + "\n");
-
-        JPanel controls = new JPanel(new GridLayout(2, 1));
-        controls.add(reset);
-        controls.add(back);
-        sidebar.add(controls, BorderLayout.NORTH);
-        sidebar.add(new JScrollPane(log), BorderLayout.CENTER);
-
-        add(grids, BorderLayout.CENTER);
-        add(sidebar, BorderLayout.EAST);
-
-        // Configura KeyBinding per il tasto "R"
-        getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke("R"), "rotate");
-        getActionMap().put("rotate", new AbstractAction() {
+        reset.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                horizontal = !horizontal;
-                log.append("Orientamento ruotato a " + (horizontal ? "orizzontale" : "verticale") + "\n");
+                resettaGioco();
+            }
+        });
+
+        menu.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                finestra.setContentPane(new Menu(finestra));
+            }
+        });
+
+        registro.setEditable(false);
+        registro.append("Posiziona le tue navi: dimensione attuale " + dimensioniNavi[indiceNaveCorrente] + "\n");
+
+        JPanel controlli = new JPanel(new GridLayout(2, 1));
+        controlli.add(reset);
+        controlli.add(menu);
+        barraLaterale.add(controlli, BorderLayout.NORTH);
+        barraLaterale.add(new JScrollPane(registro), BorderLayout.CENTER);
+
+        add(griglie, BorderLayout.CENTER);
+        add(barraLaterale, BorderLayout.EAST);
+
+        getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke("R"), "ruota");
+        getActionMap().put("ruota", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                orizzontale = !orizzontale;
+                registro.append("Orientamento ruotato a " + (orizzontale ? "orizzontale" : "verticale") + "\n");
             }
         });
     }
 
-    private JPanel createGrid(JButton[][] grid, boolean isBot) {
-        JPanel panel = new JPanel(new GridLayout(SIZE, SIZE));
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
-                JButton btn = new JButton();
-                btn.setBackground(Color.CYAN);
+    // Crea la griglia di bottoni per il giocatore o il bot
+    private JPanel creaGriglia(JButton[][] griglia, boolean èBot) {
+        JPanel pannello = new JPanel(new GridLayout(DIMENSIONE, DIMENSIONE));
+        for (int i = 0; i < DIMENSIONE; i++) {
+            for (int j = 0; j < DIMENSIONE; j++) {
+                JButton bottone = new JButton();
+                bottone.setBackground(Color.CYAN);
                 int x = i, y = j;
-                if (!isBot) {
-                    btn.addActionListener(e -> handlePlayerPlacement(x, y));
-                    btn.addMouseListener(new MouseAdapter() {
+                if (!èBot) {
+                    bottone.addActionListener(new ActionListener() {
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            gestisciPosizionamentoGiocatore(x, y);
+                        }
+                    });
+
+                    bottone.addMouseListener(new MouseAdapter() {
                         @Override
                         public void mouseEntered(MouseEvent e) {
-                            previewShipPlacement(x, y, true);
+                            anteprimaPosizionamentoNave(x, y, true);
                         }
 
                         @Override
                         public void mouseExited(MouseEvent e) {
-                            previewShipPlacement(x, y, false);
+                            anteprimaPosizionamentoNave(x, y, false);
                         }
                     });
                 } else {
-                    btn.addActionListener(e -> handlePlayerAttack(x, y));
+                    bottone.addActionListener(new ActionListener() {
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            gestisciAttaccoGiocatore(x, y);
+                        }
+                    });
                 }
-                grid[i][j] = btn;
-                panel.add(btn);
+                griglia[i][j] = bottone;
+                pannello.add(bottone);
             }
         }
-        return panel;
+        return pannello;
     }
 
-    private void handlePlayerPlacement(int x, int y) {
-        if (currentShipIndex >= shipSizes.length) return;
-        int len = shipSizes[currentShipIndex];
+    // Gestisce il posizionamento delle navi del giocatore
+    private void gestisciPosizionamentoGiocatore(int x, int y) {
+        if (indiceNaveCorrente >= dimensioniNavi.length) return;
+        int lunghezza = dimensioniNavi[indiceNaveCorrente];
 
-        if (!canPlaceShip(playerShips, x, y, horizontal)) {
-            log.append("Posizione non valida\n");
+        if (!puòPosizionareNave(naviGiocatore, x, y, orizzontale)) {
+            registro.append("Posizione non valida\n");
             return;
         }
 
-        placeShip(playerShips, playerGrid, x, y, horizontal, false, len);
-        currentShipIndex++;
-        if (currentShipIndex < shipSizes.length) {
-            log.append("Posiziona la prossima nave: dimensione " + shipSizes[currentShipIndex] + "\n");
+        posizionaNave(naviGiocatore, grigliaGiocatore, x, y, orizzontale, false, lunghezza);
+        indiceNaveCorrente++;
+        if (indiceNaveCorrente < dimensioniNavi.length) {
+            registro.append("Posiziona la prossima nave: dimensione " + dimensioniNavi[indiceNaveCorrente] + "\n");
         } else {
-            log.append("Tutte le navi posizionate. Inizia il gioco!\n");
+            registro.append("Tutte le navi posizionate. Inizia il gioco!\n");
         }
     }
 
-    private void handlePlayerAttack(int x, int y) {
-        if (botHits >= MAX_HITS || playerHits >= MAX_HITS) return;
-        if (currentShipIndex < shipSizes.length || !playerTurn) return;
-        JButton btn = botGrid[x][y];
-        if (!btn.getText().isEmpty()) return;
-        if (botShips[x][y]) {
-            btn.setBackground(Color.RED);
-            btn.setText("X");
-            log.append("Colpito!\n");
-            playerHits++;
-            checkGameOver();
+    // Gestisce l'attacco del giocatore contro il bot
+    private void gestisciAttaccoGiocatore(int x, int y) {
+        if (colpiBot >= COLPI_MASSIMI || colpiGiocatore >= COLPI_MASSIMI) return;
+        if (indiceNaveCorrente < dimensioniNavi.length || !turnoGiocatore) return;
+        JButton bottone = grigliaBot[x][y];
+        if (!bottone.getText().isEmpty()) return;
+        if (naviBot[x][y]) {
+            bottone.setBackground(Color.RED);
+            bottone.setText("X");
+            registro.append("Colpito!\n");
+            colpiGiocatore++;
+            controllaFineGioco();
         } else {
-            btn.setBackground(Color.WHITE);
-            btn.setText("O");
-            log.append("Acqua.\n");
+            bottone.setBackground(Color.WHITE);
+            bottone.setText("O");
+            registro.append("Acqua.\n");
         }
-        playerTurn = false;
-        Timer timer = new Timer(1000, e -> botAttack());
+        turnoGiocatore = false;
+        Timer timer = new Timer(1000, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                attaccoBot();
+            }
+        });
         timer.setRepeats(false);
         timer.start();
     }
 
-    private void botAttack() {
-        if (botHits >= MAX_HITS || playerHits >= MAX_HITS) return;
+    // Gestisce l'attacco del bot contro il giocatore
+    private void attaccoBot() {
+        if (colpiBot >= COLPI_MASSIMI || colpiGiocatore >= COLPI_MASSIMI) return;
 
-        Point target = null;
+        Point bersaglio = null;
 
-        // Modalità "Normale" e "Difficile"
-        if (!botTargets.isEmpty()) {
-            target = botTargets.remove(0); // Attacca il primo bersaglio nella lista
+        if (!bersagliBot.isEmpty()) {
+            bersaglio = bersagliBot.remove(0);
         } else {
-            // Se non ci sono bersagli, scegli casualmente
             do {
-                int x = random.nextInt(SIZE);
-                int y = random.nextInt(SIZE);
-                target = new Point(x, y);
-            } while (!isValidAttack(target));
+                int x = casuale.nextInt(DIMENSIONE);
+                int y = casuale.nextInt(DIMENSIONE);
+                bersaglio = new Point(x, y);
+            } while (!attaccoValido(bersaglio));
         }
 
-        int x = target.x;
-        int y = target.y;
-        JButton btn = playerGrid[x][y];
+        int x = bersaglio.x;
+        int y = bersaglio.y;
+        JButton bottone = grigliaGiocatore[x][y];
 
-        if (playerShips[x][y]) {
-            btn.setText("X");
-            btn.setBackground(Color.RED);
-            log.append("Il bot ha colpito una nave!\n");
-            botHits++;
-            addAdjacentTargets(x, y); // Aggiungi le caselle adiacenti come bersagli
-            checkGameOver();
+        if (naviGiocatore[x][y]) {
+            bottone.setText("X");
+            bottone.setBackground(Color.RED);
+            registro.append("Il bot ha colpito una nave!\n");
+            colpiBot++;
+            aggiungiBersagliAdiacenti(x, y);
+            controllaFineGioco();
         } else {
-            btn.setText("O");
-            btn.setBackground(Color.GRAY);
-            log.append("Il bot ha mancato.\n");
+            bottone.setText("O");
+            bottone.setBackground(Color.GRAY);
+            registro.append("Il bot ha mancato.\n");
         }
 
-        if (isHardMode && botHits > 0) {
-            strategizeAttack(); // Pianifica un attacco più strategico
-        }
-
-        playerTurn = true;
+        turnoGiocatore = true;
     }
 
-    private boolean isValidAttack(Point p) {
+    // Controlla se un attacco è valido
+    private boolean attaccoValido(Point p) {
         int x = p.x;
         int y = p.y;
-        return x >= 0 && x < SIZE && y >= 0 && y < SIZE && playerGrid[x][y].getText().isEmpty();
+        return x >= 0 && x < DIMENSIONE && y >= 0 && y < DIMENSIONE && grigliaGiocatore[x][y].getText().isEmpty();
     }
 
-    private void addAdjacentTargets(int x, int y) {
-        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-        for (int[] dir : directions) {
-            int nx = x + dir[0];
-            int ny = y + dir[1];
-            if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE && playerGrid[nx][ny].getText().isEmpty()) {
-                botTargets.add(new Point(nx, ny));
+    // Aggiunge bersagli adiacenti per il bot
+    private void aggiungiBersagliAdiacenti(int x, int y) {
+        int[][] direzioni = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        for (int[] direzione : direzioni) {
+            int nx = x + direzione[0];
+            int ny = y + direzione[1];
+            if (nx >= 0 && nx < DIMENSIONE && ny >= 0 && ny < DIMENSIONE && grigliaGiocatore[nx][ny].getText().isEmpty()) {
+                bersagliBot.add(new Point(nx, ny));
             }
         }
     }
 
-    private void strategizeAttack() {
-        // Logica "Difficile": considera le dimensioni delle navi rimanenti e le caselle disponibili
-        log.append("Il bot sta pianificando un attacco strategico...\n");
-        // Implementazione futura per la modalità più complessa
-    }
-
-    private void checkGameOver() {
-        if (playerHits >= MAX_HITS) {
-            log.append("Hai vinto!\n");
-            disableAll();
-        } else if (botHits >= MAX_HITS) {
-            log.append("Hai perso! Il bot ha vinto.\n");
-            disableAll();
+    // Controlla se il gioco è terminato
+    private void controllaFineGioco() {
+        if (colpiGiocatore >= COLPI_MASSIMI) {
+            registro.append("Hai vinto!\n");
+            disabilitaTutto();
+        } else if (colpiBot >= COLPI_MASSIMI) {
+            registro.append("Hai perso! Il bot ha vinto.\n");
+            disabilitaTutto();
         }
     }
 
-    private boolean canPlaceShip(boolean[][] grid, int x, int y, boolean horizontal) {
-        int len = shipSizes[currentShipIndex];
-        if (horizontal) {
-            if (y + len > SIZE) return false;
-            for (int i = 0; i < len; i++) if (grid[x][y + i]) return false;
+    // Disabilita tutti i bottoni della griglia del bot
+    private void disabilitaTutto() {
+        for (int i = 0; i < DIMENSIONE; i++) {
+            for (int j = 0; j < DIMENSIONE; j++) {
+                grigliaBot[i][j].setEnabled(false);
+            }
+        }
+    }
+
+    // Posiziona le navi del bot casualmente
+    private void posizionaNaviBot() {
+        for (int lunghezza : dimensioniNavi) {
+            int x, y;
+            boolean oriz;
+            do {
+                x = casuale.nextInt(DIMENSIONE);
+                y = casuale.nextInt(DIMENSIONE);
+                oriz = casuale.nextBoolean();
+            } while (!puòPosizionareNave(naviBot, x, y, oriz));
+            posizionaNave(naviBot, grigliaBot, x, y, oriz, true, lunghezza);
+        }
+    }
+
+    // Resetta il gioco
+    private void resettaGioco() {
+        finestra.setContentPane(new Gioco(finestra, modalitaDifficile));
+        finestra.revalidate();
+    }
+
+    // Mostra un'anteprima del posizionamento della nave
+    private void anteprimaPosizionamentoNave(int x, int y, boolean mostra) {
+        if (indiceNaveCorrente >= dimensioniNavi.length) return;
+        int lunghezza = dimensioniNavi[indiceNaveCorrente];
+
+        if (!puòPosizionareNave(naviGiocatore, x, y, orizzontale)) return;
+
+        for (int i = 0; i < lunghezza; i++) {
+            int nx = orizzontale ? x : x + i;
+            int ny = orizzontale ? y + i : y;
+
+            if (nx >= DIMENSIONE || ny >= DIMENSIONE) return;
+
+            grigliaGiocatore[nx][ny].setBackground(mostra ? Color.YELLOW : Color.CYAN);
+        }
+    }
+
+    // Verifica se una nave può essere posizionata
+    private boolean puòPosizionareNave(boolean[][] griglia, int x, int y, boolean oriz) {
+        int lunghezza = dimensioniNavi[indiceNaveCorrente];
+        if (oriz) {
+            if (y + lunghezza > DIMENSIONE) return false;
+            for (int i = 0; i < lunghezza; i++) if (griglia[x][y + i]) return false;
         } else {
-            if (x + len > SIZE) return false;
-            for (int i = 0; i < len; i++) if (grid[x + i][y]) return false;
+            if (x + lunghezza > DIMENSIONE) return false;
+            for (int i = 0; i < lunghezza; i++) if (griglia[x + i][y]) return false;
         }
         return true;
     }
 
-    private void placeShip(boolean[][] grid, JButton[][] buttons, int x, int y, boolean horizontal, boolean isBot, int len) {
-        for (int i = 0; i < len; i++) {
-            if (horizontal) {
-                grid[x][y + i] = true;
-                if (!isBot) buttons[x][y + i].setBackground(Color.GREEN);
+    // Posiziona una nave sulla griglia
+    private void posizionaNave(boolean[][] griglia, JButton[][] bottoni, int x, int y, boolean oriz, boolean èBot, int lunghezza) {
+        for (int i = 0; i < lunghezza; i++) {
+            if (oriz) {
+                griglia[x][y + i] = true;
+                if (!èBot) bottoni[x][y + i].setBackground(Color.GREEN);
             } else {
-                grid[x + i][y] = true;
-                if (!isBot) buttons[x + i][y].setBackground(Color.GREEN);
+                griglia[x + i][y] = true;
+                if (!èBot) bottoni[x + i][y].setBackground(Color.GREEN);
             }
         }
     }
-
-    private void disableAll() {
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
-                botGrid[i][j].setEnabled(false);
-            }
-        }
-    }
-
-    private void placeBotShips() {
-        for (int len : shipSizes) {
-            int x, y;
-            boolean hor;
-            do {
-                x = random.nextInt(SIZE);
-                y = random.nextInt(SIZE);
-                hor = random.nextBoolean();
-            } while (!canPlaceShip(botShips, x, y, hor));
-            placeShip(botShips, botGrid, x, y, hor, true, len);
-        }
-    }
-
-    private void resetGame() {
-        frame.setContentPane(new Gioco(frame, isHardMode));
-        frame.revalidate();
-    }
-    private void previewShipPlacement(int x, int y, boolean show) {
-    if (currentShipIndex >= shipSizes.length) return; // Controlla se tutte le navi sono già state posizionate
-    int len = shipSizes[currentShipIndex]; // Ottieni la dimensione della nave corrente
-
-    // Controlla se la nave può essere posizionata nella posizione specificata
-    if (!canPlaceShip(playerShips, x, y, horizontal)) return;
-
-    // Mostra o rimuove l'anteprima
-    for (int i = 0; i < len; i++) {
-        int nx = horizontal ? x : x + i; // Calcola la coordinata X per posizionamento verticale
-        int ny = horizontal ? y + i : y; // Calcola la coordinata Y per posizionamento orizzontale
-
-        // Controlla i limiti del tabellone
-        if (nx >= SIZE || ny >= SIZE) return;
-
-        // Cambia il colore del pulsante per mostrare l'anteprima
-        playerGrid[nx][ny].setBackground(show ? Color.YELLOW : Color.CYAN);
-    }
-}
 }
