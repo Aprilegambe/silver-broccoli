@@ -2,7 +2,7 @@ package com.mycompany.main;
 
 import javax.swing.JFrame;
 
-public class Principale {
+public class Main {
     public static void main(String[] args) {
         javax.swing.SwingUtilities.invokeLater(new Runnable() {
             @Override
